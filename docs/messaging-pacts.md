@@ -161,8 +161,9 @@ Synchronous (Request/Response) Messages
 > to each request - for example an AsyncAPI operation with a `reply` block.
 
 Unlike the fire-and-forget messages above, a synchronous message interaction has both a request and a
-response. The consumer specifies the expected request and response content, and PactNet feeds the
-generated request to your handler under test.
+response. The consumer specifies the expected request and response content, PactNet feeds the
+generated request to your handler under test, and checks that the value your handler returns matches
+the generated response content (matchers stripped, generators applied) before writing the pact file.
 
 In code, this is:
 

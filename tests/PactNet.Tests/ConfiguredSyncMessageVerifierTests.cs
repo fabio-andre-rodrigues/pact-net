@@ -72,6 +72,33 @@ namespace PactNet.Tests
         }
 
         [Fact]
+        public void Verify_ResponseDoesNotMatchConfiguredResponse_ThrowsVerificationException()
+        {
+            (var verifier, _) = this.SetupMessage();
+
+            Action action = () => verifier.Verify<Request, Response>(_ => new Response { Status = "not-ok" });
+
+            action.Should().Throw<PactMessageConsumerVerificationException>();
+        }
+
+        [Fact]
+        public void Verify_ResponseDoesNotMatchConfiguredResponse_DoesNotWritePactFile()
+        {
+            (var verifier, _) = this.SetupMessage();
+
+            try
+            {
+                verifier.Verify<Request, Response>(_ => new Response { Status = "not-ok" });
+            }
+            catch
+            {
+                // ignore
+            }
+
+            this.mockDriver.Verify(s => s.WritePactFile(It.IsAny<string>()), Times.Never);
+        }
+
+        [Fact]
         public async Task VerifyAsync_SuccessfullyVerified_WritesPactFile()
         {
             (var verifier, Request request) = this.SetupMessage();
@@ -93,6 +120,33 @@ namespace PactNet.Tests
             Func<Task> action = () => verifier.VerifyAsync<Request, Response>(_ => throw new Exception("oh noes"));
 
             await action.Should().ThrowAsync<PactMessageConsumerVerificationException>();
+        }
+
+        [Fact]
+        public async Task VerifyAsync_ResponseDoesNotMatchConfiguredResponse_ThrowsVerificationException()
+        {
+            (var verifier, _) = this.SetupMessage();
+
+            Func<Task> action = () => verifier.VerifyAsync<Request, Response>(_ => Task.FromResult(new Response { Status = "not-ok" }));
+
+            await action.Should().ThrowAsync<PactMessageConsumerVerificationException>();
+        }
+
+        [Fact]
+        public async Task VerifyAsync_ResponseDoesNotMatchConfiguredResponse_DoesNotWritePactFile()
+        {
+            (var verifier, _) = this.SetupMessage();
+
+            try
+            {
+                await verifier.VerifyAsync<Request, Response>(_ => Task.FromResult(new Response { Status = "not-ok" }));
+            }
+            catch
+            {
+                // ignore
+            }
+
+            this.mockDriver.Verify(s => s.WritePactFile(It.IsAny<string>()), Times.Never);
         }
 
         private (ConfiguredSyncMessageVerifier Verifier, Request Request) SetupMessage()

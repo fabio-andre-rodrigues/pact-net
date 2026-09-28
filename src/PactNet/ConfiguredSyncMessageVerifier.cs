@@ -38,18 +38,25 @@ namespace PactNet
         }
 
         /// <summary>
-        /// Verify a request message is read and handled correctly and write the message pact
+        /// Verify a request message is read and handled correctly, and that the response returned
+        /// by the handler matches the configured response content, then write the message pact
         /// </summary>
         /// <param name="handler">The method handling the request message and producing a response</param>
         public void Verify<TRequest, TResponse>(Func<TRequest, TResponse> handler)
         {
             try
             {
-                TRequest request = this.GeneratedRequest<TRequest>();
+                NativeSyncMessage generated = this.GeneratedMessage();
+                TRequest request = DeserializeContent<TRequest>((JsonElement)generated.Request.Contents);
 
-                handler(request);
+                TResponse actualResponse = handler(request);
 
+                this.VerifyResponse(generated, actualResponse);
                 this.driver.WritePactFile(this.config.PactDir);
+            }
+            catch (PactMessageConsumerVerificationException)
+            {
+                throw;
             }
             catch (Exception e)
             {
@@ -58,18 +65,25 @@ namespace PactNet
         }
 
         /// <summary>
-        /// Verify a request message is read and handled correctly and write the message pact
+        /// Verify a request message is read and handled correctly, and that the response returned
+        /// by the handler matches the configured response content, then write the message pact
         /// </summary>
         /// <param name="handler">The method handling the request message and producing a response</param>
         public async Task VerifyAsync<TRequest, TResponse>(Func<TRequest, Task<TResponse>> handler)
         {
             try
             {
-                TRequest request = this.GeneratedRequest<TRequest>();
+                NativeSyncMessage generated = this.GeneratedMessage();
+                TRequest request = DeserializeContent<TRequest>((JsonElement)generated.Request.Contents);
 
-                await handler(request);
+                TResponse actualResponse = await handler(request);
 
+                this.VerifyResponse(generated, actualResponse);
                 this.driver.WritePactFile(this.config.PactDir);
+            }
+            catch (PactMessageConsumerVerificationException)
+            {
+                throw;
             }
             catch (Exception e)
             {
@@ -78,23 +92,135 @@ namespace PactNet
         }
 
         /// <summary>
-        /// Get the actual request message, with any matchers removed and any configured
-        /// generators applied
+        /// Get the generated message, with any matchers removed and any configured generators applied
         /// </summary>
-        /// <typeparam name="TRequest">the type of the request message</typeparam>
-        /// <returns>the request message</returns>
-        private TRequest GeneratedRequest<TRequest>()
+        /// <returns>the native message</returns>
+        private NativeSyncMessage GeneratedMessage()
         {
             string generated = this.driver.GenerateContents();
-            NativeSyncMessage content = JsonSerializer.Deserialize<NativeSyncMessage>(generated, NativeMessageSettings);
+            return JsonSerializer.Deserialize<NativeSyncMessage>(generated, NativeMessageSettings);
+        }
 
+        /// <summary>
+        /// Check the handler's response against the configured response content
+        /// </summary>
+        /// <param name="generated">the generated message</param>
+        /// <param name="actualResponse">the response returned by the handler under test</param>
+        private void VerifyResponse<TResponse>(NativeSyncMessage generated, TResponse actualResponse)
+        {
+            JsonElement expectedContent = ((JsonElement)generated.Response[0].Contents).GetProperty("content");
+
+            string actualJson = JsonSerializer.Serialize(actualResponse, this.config.DefaultJsonSettings);
+            using JsonDocument actualDocument = JsonDocument.Parse(actualJson);
+
+            if (!JsonElementsEqual(expectedContent, actualDocument.RootElement))
+            {
+                throw new PactMessageConsumerVerificationException(
+                    $"The response returned by the consumer handler did not match the configured response content. " +
+                    $"Expected {expectedContent.GetRawText()} but got {actualJson}");
+            }
+        }
+
+        /// <summary>
+        /// Deserialize the content of the request or response, with any matchers removed and any
+        /// configured generators applied
+        /// </summary>
+        /// <typeparam name="T">the type to deserialize the content into</typeparam>
+        /// <param name="contents">the generated message contents</param>
+        /// <returns>the deserialized content</returns>
+        private T DeserializeContent<T>(JsonElement contents)
+        {
             // Synchronous messages only exist in the V4 Pact format, so the generated contents
             // always use the V4 body envelope (a `content` field)
-            string contentString = ((JsonElement)content.Request.Contents).GetProperty("content").GetRawText();
+            string contentString = contents.GetProperty("content").GetRawText();
 
-            TRequest request = JsonSerializer.Deserialize<TRequest>(contentString, this.config.DefaultJsonSettings);
+            return JsonSerializer.Deserialize<T>(contentString, this.config.DefaultJsonSettings);
+        }
 
-            return request;
+        /// <summary>
+        /// Recursively compare two JSON elements for structural equality, ignoring object property order
+        /// </summary>
+        private static bool JsonElementsEqual(JsonElement expected, JsonElement actual)
+        {
+            if (expected.ValueKind != actual.ValueKind)
+            {
+                return false;
+            }
+
+            switch (expected.ValueKind)
+            {
+                case JsonValueKind.Object:
+                    var expectedProperties = new System.Collections.Generic.Dictionary<string, JsonElement>(StringComparer.Ordinal);
+                    foreach (JsonProperty property in expected.EnumerateObject())
+                    {
+                        expectedProperties[property.Name] = property.Value;
+                    }
+
+                    var actualProperties = new System.Collections.Generic.Dictionary<string, JsonElement>(StringComparer.Ordinal);
+                    foreach (JsonProperty property in actual.EnumerateObject())
+                    {
+                        actualProperties[property.Name] = property.Value;
+                    }
+
+                    if (expectedProperties.Count != actualProperties.Count)
+                    {
+                        return false;
+                    }
+
+                    foreach (var property in expectedProperties)
+                    {
+                        if (!actualProperties.TryGetValue(property.Key, out JsonElement actualValue) ||
+                            !JsonElementsEqual(property.Value, actualValue))
+                        {
+                            return false;
+                        }
+                    }
+
+                    return true;
+
+                case JsonValueKind.Array:
+                    var expectedItems = new System.Collections.Generic.List<JsonElement>();
+                    foreach (JsonElement item in expected.EnumerateArray())
+                    {
+                        expectedItems.Add(item);
+                    }
+
+                    var actualItems = new System.Collections.Generic.List<JsonElement>();
+                    foreach (JsonElement item in actual.EnumerateArray())
+                    {
+                        actualItems.Add(item);
+                    }
+
+                    if (expectedItems.Count != actualItems.Count)
+                    {
+                        return false;
+                    }
+
+                    for (int i = 0; i < expectedItems.Count; i++)
+                    {
+                        if (!JsonElementsEqual(expectedItems[i], actualItems[i]))
+                        {
+                            return false;
+                        }
+                    }
+
+                    return true;
+
+                case JsonValueKind.String:
+                    return expected.GetString() == actual.GetString();
+
+                case JsonValueKind.Number:
+                    return expected.GetRawText() == actual.GetRawText();
+
+                case JsonValueKind.True:
+                case JsonValueKind.False:
+                case JsonValueKind.Null:
+                case JsonValueKind.Undefined:
+                    return true;
+
+                default:
+                    return expected.GetRawText() == actual.GetRawText();
+            }
         }
     }
 }
