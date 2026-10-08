@@ -1,5 +1,6 @@
 using System;
 using System.Runtime.InteropServices;
+using System.Text.Json;
 using PactNet.Interop;
 
 namespace PactNet.Drivers
@@ -36,6 +37,19 @@ namespace PactNet.Drivers
         /// <param name="value">Parameter value</param>
         public void GivenWithParam(string description, string name, string value)
             => NativeInterop.GivenWithParam(this.interaction, description, name, value).CheckInteropSuccess();
+
+        /// <summary>
+        /// Add a reference to an external resource, e.g. an AsyncAPI operation, to the interaction
+        /// </summary>
+        /// <param name="group">Reference group, e.g. the name of the external specification</param>
+        /// <param name="name">Reference name, e.g. operationId</param>
+        /// <param name="value">Reference value</param>
+        /// <remarks>
+        /// The FFI parses the value as JSON and only falls back to a string if that fails, so it's encoded first
+        /// to stop a value like "123" being written as a number
+        /// </remarks>
+        public void AddReference(string group, string name, string value)
+            => NativeInterop.AddInteractionReference(this.interaction, group, name, JsonSerializer.Serialize(value)).CheckInteropSuccess();
 
         /// <summary>
         /// Set the metadata of the request message

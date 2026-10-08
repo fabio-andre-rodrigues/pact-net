@@ -57,6 +57,14 @@ namespace PactNet.Tests
         }
 
         [Fact]
+        public void WithReference_WhenCalled_AddsReference()
+        {
+            this.builder.WithReference("AsyncAPI", "operationId", "getOrder");
+
+            this.mockDriver.Verify(s => s.AddReference("AsyncAPI", "operationId", "getOrder"));
+        }
+
+        [Fact]
         public void WithRequestMetadata_WhenCalled_AddsRequestMetadata()
         {
             this.builder.WithRequestMetadata("poolId", "1234");

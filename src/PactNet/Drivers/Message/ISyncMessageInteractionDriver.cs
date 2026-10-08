@@ -6,6 +6,14 @@ namespace PactNet.Drivers
     internal interface ISyncMessageInteractionDriver : IProviderStateDriver, ICompletedPactDriver
     {
         /// <summary>
+        /// Add a reference to an external resource, e.g. an AsyncAPI operation, to the interaction
+        /// </summary>
+        /// <param name="group">Reference group, e.g. the name of the external specification</param>
+        /// <param name="name">Reference name, e.g. operationId</param>
+        /// <param name="value">Reference value</param>
+        void AddReference(string group, string name, string value);
+
+        /// <summary>
         /// Set a metadata value of the request message
         /// </summary>
         /// <param name="key">the key</param>

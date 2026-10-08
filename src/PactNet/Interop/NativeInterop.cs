@@ -69,6 +69,9 @@ namespace PactNet.Interop
         [DllImport(DllName, EntryPoint = "pactffi_verify")]
         public static extern int Verify(string args);
 
+        [DllImport(DllName, EntryPoint = "pactffi_add_interaction_reference")]
+        public static extern bool AddInteractionReference(InteractionHandle interaction, string group, string name, string value);
+
         #endregion Http Interop Support
 
         #region Messaging Interop Support

@@ -4,6 +4,14 @@
   },
   "interactions": [
     {
+      "comments": {
+        "references": {
+          "AsyncAPI": {
+            "operationId": "getOrder",
+            "version": "123"
+          }
+        }
+      },
       "description": "a sample request",
       "pending": false,
       "providerStates": [

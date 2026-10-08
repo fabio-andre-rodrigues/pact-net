@@ -192,7 +192,10 @@ public class OrderLookupConsumerTests
         this.messagePact
             .ExpectsToReceive("a request for an order")
             .Given("order 1234 exists")
+            .WithReference("AsyncAPI", "operationId", "getOrder")
+            .WithRequestMetadata("priority", 1)
             .WithRequestJsonContent(new { OrderId = Match.Type("1234") })
+            .WithResponseMetadata("replyTo", Match.Regex("orders-reply", "^orders-"))
             .WithResponseJsonContent(new { Status = Match.Type("shipped") })
             .Verify<OrderRequest, OrderStatus>(request =>
             {
@@ -202,5 +205,9 @@ public class OrderLookupConsumerTests
     }
 }
 ```
+
+Metadata values are serialised as JSON, so they keep their type (`1` is a number, `"1"` is a string) and can be
+matchers. `WithReference` links the interaction to an external resource such as an AsyncAPI operation; it's
+written to the pact under `comments.references.{group}.{name}`.
 
 As with fire-and-forget messages, a pact file is written to disk once all consumer tests have passed

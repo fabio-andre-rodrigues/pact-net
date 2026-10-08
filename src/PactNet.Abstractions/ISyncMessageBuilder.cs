@@ -24,6 +24,16 @@ namespace PactNet
         ISyncMessageBuilderV4 Given(string providerState, IDictionary<string, string> parameters);
 
         /// <summary>
+        /// Add a reference to an external resource, e.g. an AsyncAPI operation, which is written to the
+        /// interaction's comments under <c>references.{group}.{name}</c>
+        /// </summary>
+        /// <param name="group">Reference group, e.g. AsyncAPI</param>
+        /// <param name="name">Reference name, e.g. operationId</param>
+        /// <param name="value">Reference value</param>
+        /// <returns>Fluent builder</returns>
+        ISyncMessageBuilderV4 WithReference(string group, string name, string value);
+
+        /// <summary>
         /// Set a request metadata value, which is serialised as JSON
         /// </summary>
         /// <param name="key">the metadata key</param>

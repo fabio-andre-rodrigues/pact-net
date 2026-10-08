@@ -243,6 +243,8 @@ namespace PactNet.Tests
                 {
                     ["foo"] = "bar"
                 })
+               .WithReference("AsyncAPI", "operationId", "getOrder")
+               .WithReference("AsyncAPI", "version", "123")
                .WithRequestMetadata("queueId", "1234")
                .WithRequestMetadata("priority", 1)
                .WithRequestJsonContent(new { Int = Match.Integer(1), String = Match.Type("a description") })

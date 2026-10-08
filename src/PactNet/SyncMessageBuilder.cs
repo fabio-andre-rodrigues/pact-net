@@ -43,6 +43,10 @@ namespace PactNet
             => Given(providerState, parameters);
 
         /// <inheritdoc cref="ISyncMessageBuilderV4"/>
+        ISyncMessageBuilderV4 ISyncMessageBuilderV4.WithReference(string group, string name, string value)
+            => WithReference(group, name, value);
+
+        /// <inheritdoc cref="ISyncMessageBuilderV4"/>
         ISyncMessageBuilderV4 ISyncMessageBuilderV4.WithRequestMetadata(string key, dynamic value)
             => WithRequestMetadata(key, value);
 
@@ -92,6 +96,20 @@ namespace PactNet
             {
                 this.driver.GivenWithParam(providerState, param.Key, param.Value);
             }
+
+            return this;
+        }
+
+        /// <summary>
+        /// Add a reference to an external resource, e.g. an AsyncAPI operation
+        /// </summary>
+        /// <param name="group">Reference group</param>
+        /// <param name="name">Reference name</param>
+        /// <param name="value">Reference value</param>
+        /// <returns>Fluent builder</returns>
+        internal SyncMessageBuilder WithReference(string group, string name, string value)
+        {
+            this.driver.AddReference(group, name, value);
 
             return this;
         }
