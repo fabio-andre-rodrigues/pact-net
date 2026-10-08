@@ -8,6 +8,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 using FluentAssertions;
+using PactNet.Exceptions;
 using PactNet.Matchers;
 using PactNet.Output.Xunit;
 using Xunit;
@@ -253,7 +254,9 @@ namespace PactNet.Tests
                .Verify<SyncData, SyncData>(request =>
                 {
                     received = request;
-                    return new SyncData { Int = 2, String = "a reply" };
+
+                    // matched against the response matchers, not the example values
+                    return new SyncData { Int = 7, String = "another reply" };
                 });
 
             received.Should().BeEquivalentTo(new SyncData { Int = 1, String = "a description" });
@@ -262,6 +265,30 @@ namespace PactNet.Tests
             string expectedPact = File.ReadAllText("data/v4-sync-message-consumer-integration.json").TrimEnd();
 
             actualPact.Should().Be(expectedPact);
+        }
+
+        [Theory]
+        [InlineData("2026-01-01 10:00:00", true)]
+        [InlineData("01/01/2026", false)]
+        public void WithSynchronousMessageInteractions_RegexMatcher_ChecksResponseFormat(string actual, bool matches)
+        {
+            IPactV4 messagePact = Pact.V4("PactExtensionsTests-SyncMessageConsumer-Regex", "PactExtensionsTests-SyncMessageProvider", config);
+
+            Action action = () => messagePact
+                .WithSynchronousMessageInteractions()
+                .ExpectsToReceive("a sample request")
+                .WithRequestJsonContent(new { Int = 1 })
+                .WithResponseJsonContent(new { Int = Match.Integer(2), String = Match.Regex("2024-10-12 03:31:11", @"^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$") })
+                .Verify<SyncData, SyncData>(_ => new SyncData { Int = 3, String = actual });
+
+            if (matches)
+            {
+                action.Should().NotThrow();
+            }
+            else
+            {
+                action.Should().Throw<PactMessageConsumerVerificationException>().WithMessage("*$.string*");
+            }
         }
 
         [Fact]

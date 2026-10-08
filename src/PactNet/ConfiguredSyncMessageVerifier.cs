@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Text.Json;
 using System.Threading.Tasks;
 using PactNet.Drivers;
@@ -51,7 +53,7 @@ namespace PactNet
 
                 TResponse actualResponse = handler(request);
 
-                this.VerifyResponse(generated, actualResponse);
+                this.VerifyResponse(actualResponse);
                 this.driver.WritePactFile(this.config.PactDir);
             }
             catch (PactMessageConsumerVerificationException)
@@ -78,7 +80,7 @@ namespace PactNet
 
                 TResponse actualResponse = await handler(request);
 
-                this.VerifyResponse(generated, actualResponse);
+                this.VerifyResponse(actualResponse);
                 this.driver.WritePactFile(this.config.PactDir);
             }
             catch (PactMessageConsumerVerificationException)
@@ -102,23 +104,38 @@ namespace PactNet
         }
 
         /// <summary>
-        /// Check the handler's response against the configured response content
+        /// Check the handler's response against the configured response, applying its matching rules
         /// </summary>
-        /// <param name="generated">the generated message</param>
         /// <param name="actualResponse">the response returned by the handler under test</param>
-        private void VerifyResponse<TResponse>(NativeSyncMessage generated, TResponse actualResponse)
+        private void VerifyResponse<TResponse>(TResponse actualResponse)
         {
-            JsonElement expectedContent = ((JsonElement)generated.Response[0].Contents).GetProperty("content");
-
             string actualJson = JsonSerializer.Serialize(actualResponse, this.config.DefaultJsonSettings);
-            using JsonDocument actualDocument = JsonDocument.Parse(actualJson);
+            string mismatchesJson = this.driver.MatchResponseContents(0, "application/json", actualJson);
 
-            if (!JsonElementsEqual(expectedContent, actualDocument.RootElement))
+            using JsonDocument mismatches = JsonDocument.Parse(mismatchesJson);
+
+            if (mismatches.RootElement.GetArrayLength() > 0)
             {
+                IEnumerable<string> descriptions = mismatches.RootElement
+                                                             .EnumerateArray()
+                                                             .Select(DescribeMismatch);
+
                 throw new PactMessageConsumerVerificationException(
-                    $"The response returned by the consumer handler did not match the configured response content. " +
-                    $"Expected {expectedContent.GetRawText()} but got {actualJson}");
+                    "The response returned by the consumer handler did not match the configured response:" +
+                    Environment.NewLine + string.Join(Environment.NewLine, descriptions));
             }
+        }
+
+        /// <summary>
+        /// Describe a mismatch returned by the FFI, e.g. "$.status: Expected 1 (Integer) to be the same type as 'shipped' (String)"
+        /// </summary>
+        private static string DescribeMismatch(JsonElement mismatch)
+        {
+            string description = mismatch.TryGetProperty("mismatch", out JsonElement text) ? text.GetString() : mismatch.GetRawText();
+
+            return mismatch.TryGetProperty("path", out JsonElement path)
+                       ? $"  {path.GetString()}: {description}"
+                       : $"  {description}";
         }
 
         /// <summary>
@@ -135,92 +152,6 @@ namespace PactNet
             string contentString = contents.GetProperty("content").GetRawText();
 
             return JsonSerializer.Deserialize<T>(contentString, this.config.DefaultJsonSettings);
-        }
-
-        /// <summary>
-        /// Recursively compare two JSON elements for structural equality, ignoring object property order
-        /// </summary>
-        private static bool JsonElementsEqual(JsonElement expected, JsonElement actual)
-        {
-            if (expected.ValueKind != actual.ValueKind)
-            {
-                return false;
-            }
-
-            switch (expected.ValueKind)
-            {
-                case JsonValueKind.Object:
-                    var expectedProperties = new System.Collections.Generic.Dictionary<string, JsonElement>(StringComparer.Ordinal);
-                    foreach (JsonProperty property in expected.EnumerateObject())
-                    {
-                        expectedProperties[property.Name] = property.Value;
-                    }
-
-                    var actualProperties = new System.Collections.Generic.Dictionary<string, JsonElement>(StringComparer.Ordinal);
-                    foreach (JsonProperty property in actual.EnumerateObject())
-                    {
-                        actualProperties[property.Name] = property.Value;
-                    }
-
-                    if (expectedProperties.Count != actualProperties.Count)
-                    {
-                        return false;
-                    }
-
-                    foreach (var property in expectedProperties)
-                    {
-                        if (!actualProperties.TryGetValue(property.Key, out JsonElement actualValue) ||
-                            !JsonElementsEqual(property.Value, actualValue))
-                        {
-                            return false;
-                        }
-                    }
-
-                    return true;
-
-                case JsonValueKind.Array:
-                    var expectedItems = new System.Collections.Generic.List<JsonElement>();
-                    foreach (JsonElement item in expected.EnumerateArray())
-                    {
-                        expectedItems.Add(item);
-                    }
-
-                    var actualItems = new System.Collections.Generic.List<JsonElement>();
-                    foreach (JsonElement item in actual.EnumerateArray())
-                    {
-                        actualItems.Add(item);
-                    }
-
-                    if (expectedItems.Count != actualItems.Count)
-                    {
-                        return false;
-                    }
-
-                    for (int i = 0; i < expectedItems.Count; i++)
-                    {
-                        if (!JsonElementsEqual(expectedItems[i], actualItems[i]))
-                        {
-                            return false;
-                        }
-                    }
-
-                    return true;
-
-                case JsonValueKind.String:
-                    return expected.GetString() == actual.GetString();
-
-                case JsonValueKind.Number:
-                    return expected.GetRawText() == actual.GetRawText();
-
-                case JsonValueKind.True:
-                case JsonValueKind.False:
-                case JsonValueKind.Null:
-                case JsonValueKind.Undefined:
-                    return true;
-
-                default:
-                    return expected.GetRawText() == actual.GetRawText();
-            }
         }
     }
 }

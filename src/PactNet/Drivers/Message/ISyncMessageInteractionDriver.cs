@@ -47,5 +47,14 @@ namespace PactNet.Drivers
         /// </summary>
         /// <returns>The generated request and response contents</returns>
         string GenerateContents();
+
+        /// <summary>
+        /// Match actual contents against an expected response, applying the response's matching rules
+        /// </summary>
+        /// <param name="index">Index of the expected response</param>
+        /// <param name="contentType">Content type of the actual contents</param>
+        /// <param name="contents">Actual contents</param>
+        /// <returns>JSON array of mismatches, which is empty if the contents matched</returns>
+        string MatchResponseContents(int index, string contentType, string contents);
     }
 }

@@ -95,5 +95,26 @@ namespace PactNet.Drivers
             NativeInterop.FreeString(pointer);
             return body;
         }
+
+        /// <summary>
+        /// Match actual contents against an expected response, applying the response's matching rules
+        /// </summary>
+        /// <param name="index">Index of the expected response</param>
+        /// <param name="contentType">Content type of the actual contents</param>
+        /// <param name="contents">Actual contents</param>
+        /// <returns>JSON array of mismatches, which is empty if the contents matched</returns>
+        public string MatchResponseContents(int index, string contentType, string contents)
+        {
+            IntPtr pointer = NativeInterop.SyncMessageMatchResponseContents(this.interaction, new UIntPtr((uint)index), contentType, contents);
+
+            if (pointer == IntPtr.Zero)
+            {
+                throw new InvalidOperationException($"Unable to match the response contents against expected response {index}");
+            }
+
+            string mismatches = Marshal.PtrToStringAnsi(pointer);
+            NativeInterop.FreeString(pointer);
+            return mismatches;
+        }
     }
 }

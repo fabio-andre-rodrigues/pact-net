@@ -103,6 +103,9 @@ namespace PactNet.Interop
         [DllImport(DllName, EntryPoint = "pactffi_sync_message_generate_contents")]
         public static extern IntPtr SyncMessageGenerateContents(InteractionHandle message);
 
+        [DllImport(DllName, EntryPoint = "pactffi_sync_message_match_response_contents")]
+        public static extern IntPtr SyncMessageMatchResponseContents(InteractionHandle message, UIntPtr index, string contentType, string contents);
+
         #endregion Http Interop Support
 
         #region Verifier Support

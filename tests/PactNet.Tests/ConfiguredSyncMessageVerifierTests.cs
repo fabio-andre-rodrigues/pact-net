@@ -82,6 +82,27 @@ namespace PactNet.Tests
         }
 
         [Fact]
+        public void Verify_ResponseDoesNotMatchConfiguredResponse_ReportsMismatches()
+        {
+            (var verifier, _) = this.SetupMessage();
+
+            Action action = () => verifier.Verify<Request, Response>(_ => new Response { Status = "not-ok" });
+
+            action.Should().Throw<PactMessageConsumerVerificationException>()
+                  .WithMessage("*$.status: Expected 'not-ok' to be equal to 'ok'*");
+        }
+
+        [Fact]
+        public void Verify_WhenCalled_MatchesResponseSerialisedWithUserSettings()
+        {
+            (var verifier, _) = this.SetupMessage();
+
+            verifier.Verify<Request, Response>(_ => new Response { Status = "ok" });
+
+            this.mockDriver.Verify(s => s.MatchResponseContents(0, "application/json", @"{""status"":""ok""}"));
+        }
+
+        [Fact]
         public void Verify_ResponseDoesNotMatchConfiguredResponse_DoesNotWritePactFile()
         {
             (var verifier, _) = this.SetupMessage();
@@ -176,6 +197,13 @@ namespace PactNet.Tests
             this.mockDriver
                 .Setup(s => s.GenerateContents())
                 .Returns(JsonSerializer.Serialize(native, CamelCase));
+
+            // simulates the FFI applying the response matching rules
+            this.mockDriver
+                .Setup(s => s.MatchResponseContents(0, "application/json", It.IsAny<string>()))
+                .Returns((int _, string _, string actual) => actual == @"{""status"":""ok""}"
+                             ? "[]"
+                             : @"[{""type"":""BodyMismatch"",""path"":""$.status"",""mismatch"":""Expected 'not-ok' to be equal to 'ok'""}]");
 
             return (verifier, request);
         }
