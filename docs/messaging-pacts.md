@@ -162,8 +162,11 @@ Synchronous (Request/Response) Messages
 
 Unlike the fire-and-forget messages above, a synchronous message interaction has both a request and a
 response. The consumer specifies the expected request and response content, PactNet feeds the
-generated request to your handler under test, and checks that the value your handler returns matches
-the generated response content (matchers stripped, generators applied) before writing the pact file.
+generated request (matchers stripped, generators applied) to your handler under test, and checks the
+value your handler returns against the response's matchers before writing the pact file. For example
+`Match.Type("shipped")` accepts any string, `Match.Integer(12)` any integer, `Match.Decimal(12.5)` any
+decimal, and `Match.Regex(...)` any value in the given format, such as a datetime. Values without a
+matcher must be equal, and extra properties in the response are allowed.
 
 In code, this is:
 
