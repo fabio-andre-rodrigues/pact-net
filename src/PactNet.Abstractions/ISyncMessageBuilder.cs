@@ -24,20 +24,20 @@ namespace PactNet
         ISyncMessageBuilderV4 Given(string providerState, IDictionary<string, string> parameters);
 
         /// <summary>
-        /// Set the request metadata
+        /// Set a request metadata value, which is serialised as JSON
         /// </summary>
         /// <param name="key">the metadata key</param>
-        /// <param name="value">the metadata value</param>
+        /// <param name="value">the metadata value, e.g. a string, number, boolean or matcher</param>
         /// <returns>Fluent builder</returns>
-        ISyncMessageBuilderV4 WithRequestMetadata(string key, string value);
+        ISyncMessageBuilderV4 WithRequestMetadata(string key, dynamic value);
 
         /// <summary>
-        /// Set the response metadata
+        /// Set a response metadata value, which is serialised as JSON
         /// </summary>
         /// <param name="key">the metadata key</param>
-        /// <param name="value">the metadata value</param>
+        /// <param name="value">the metadata value, e.g. a string, number, boolean or matcher</param>
         /// <returns>Fluent builder</returns>
-        ISyncMessageBuilderV4 WithResponseMetadata(string key, string value);
+        ISyncMessageBuilderV4 WithResponseMetadata(string key, dynamic value);
 
         /// <summary>
         /// Set the request content which is serialised as JSON

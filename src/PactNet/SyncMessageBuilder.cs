@@ -15,6 +15,10 @@ namespace PactNet
         private readonly PactConfig config;
         private readonly PactSpecification version;
 
+        // pactffi_with_metadata only applies response metadata to responses that already exist, and the response is
+        // only created by the terminal WithResponseJsonContent call, so response metadata is applied after it
+        private readonly List<KeyValuePair<string, string>> responseMetadata = new List<KeyValuePair<string, string>>();
+
         /// <summary>
         /// Initialises a new instance of the <see cref="SyncMessageBuilder"/> class.
         /// </summary>
@@ -39,11 +43,11 @@ namespace PactNet
             => Given(providerState, parameters);
 
         /// <inheritdoc cref="ISyncMessageBuilderV4"/>
-        ISyncMessageBuilderV4 ISyncMessageBuilderV4.WithRequestMetadata(string key, string value)
+        ISyncMessageBuilderV4 ISyncMessageBuilderV4.WithRequestMetadata(string key, dynamic value)
             => WithRequestMetadata(key, value);
 
         /// <inheritdoc cref="ISyncMessageBuilderV4"/>
-        ISyncMessageBuilderV4 ISyncMessageBuilderV4.WithResponseMetadata(string key, string value)
+        ISyncMessageBuilderV4 ISyncMessageBuilderV4.WithResponseMetadata(string key, dynamic value)
             => WithResponseMetadata(key, value);
 
         /// <inheritdoc cref="ISyncMessageBuilderV4"/>
@@ -93,27 +97,31 @@ namespace PactNet
         }
 
         /// <summary>
-        /// Set the request metadata
+        /// Set a request metadata value, which is serialised as JSON
         /// </summary>
         /// <param name="key">key of the metadata</param>
         /// <param name="value">value of the metadata</param>
         /// <returns>Fluent builder</returns>
-        internal SyncMessageBuilder WithRequestMetadata(string key, string value)
+        internal SyncMessageBuilder WithRequestMetadata(string key, dynamic value)
         {
-            this.driver.WithRequestMetadata(key, value);
+            string serialised = JsonSerializer.Serialize(value, this.config.DefaultJsonSettings);
+
+            this.driver.WithRequestMetadata(key, serialised);
 
             return this;
         }
 
         /// <summary>
-        /// Set the response metadata
+        /// Set a response metadata value, which is serialised as JSON
         /// </summary>
         /// <param name="key">key of the metadata</param>
         /// <param name="value">value of the metadata</param>
         /// <returns>Fluent builder</returns>
-        internal SyncMessageBuilder WithResponseMetadata(string key, string value)
+        internal SyncMessageBuilder WithResponseMetadata(string key, dynamic value)
         {
-            this.driver.WithResponseMetadata(key, value);
+            string serialised = JsonSerializer.Serialize(value, this.config.DefaultJsonSettings);
+
+            this.responseMetadata.Add(new KeyValuePair<string, string>(key, serialised));
 
             return this;
         }
@@ -158,6 +166,11 @@ namespace PactNet
             string serialised = JsonSerializer.Serialize(body, settings);
 
             this.driver.WithResponseContents("application/json", serialised);
+
+            foreach (KeyValuePair<string, string> metadata in this.responseMetadata)
+            {
+                this.driver.WithResponseMetadata(metadata.Key, metadata.Value);
+            }
 
             return new ConfiguredSyncMessageVerifier(this.driver, this.config, this.version);
         }

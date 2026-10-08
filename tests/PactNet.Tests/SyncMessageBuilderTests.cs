@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Text.Json;
+using FluentAssertions;
 using Moq;
 using PactNet.Drivers;
 using PactNet.Interop;
@@ -60,15 +61,46 @@ namespace PactNet.Tests
         {
             this.builder.WithRequestMetadata("poolId", "1234");
 
-            this.mockDriver.Verify(s => s.WithRequestMetadata("poolId", "1234"));
+            this.mockDriver.Verify(s => s.WithRequestMetadata("poolId", @"""1234"""));
         }
 
         [Fact]
-        public void WithResponseMetadata_WhenCalled_AddsResponseMetadata()
+        public void WithRequestMetadata_TypedValues_KeepsTheirJsonType()
         {
-            this.builder.WithResponseMetadata("poolId", "1234");
+            this.builder.WithRequestMetadata("count", 1234);
+            this.builder.WithRequestMetadata("enabled", true);
 
-            this.mockDriver.Verify(s => s.WithResponseMetadata("poolId", "1234"));
+            this.mockDriver.Verify(s => s.WithRequestMetadata("count", "1234"));
+            this.mockDriver.Verify(s => s.WithRequestMetadata("enabled", "true"));
+        }
+
+        [Fact]
+        public void WithRequestMetadata_Matcher_AddsMatcher()
+        {
+            this.builder.WithRequestMetadata("poolId", Match.Regex("1234", "^[0-9]{4}$"));
+
+            this.mockDriver.Verify(s => s.WithRequestMetadata("poolId", @"{""pact:matcher:type"":""regex"",""value"":""1234"",""regex"":""^[0-9]{4}$""}"));
+        }
+
+        [Fact]
+        public void WithResponseMetadata_WhenCalled_AddsResponseMetadataAfterResponseContent()
+        {
+            var calls = new List<string>();
+            this.mockDriver
+                .Setup(s => s.WithResponseContents(It.IsAny<string>(), It.IsAny<string>()))
+                .Callback(() => calls.Add("contents"));
+            this.mockDriver
+                .Setup(s => s.WithResponseMetadata(It.IsAny<string>(), It.IsAny<string>()))
+                .Callback((string key, string value) => calls.Add($"{key}={value}"));
+
+            this.builder.WithResponseMetadata("poolId", "1234");
+            this.builder.WithResponseMetadata("region", "eu");
+
+            calls.Should().BeEmpty("the FFI drops response metadata set before the response exists");
+
+            this.builder.WithResponseJsonContent(new { Id = 1 });
+
+            calls.Should().Equal("contents", @"poolId=""1234""", @"region=""eu""");
         }
 
         [Fact]

@@ -6,17 +6,17 @@ namespace PactNet.Drivers
     internal interface ISyncMessageInteractionDriver : IProviderStateDriver, ICompletedPactDriver
     {
         /// <summary>
-        /// Set the metadata of the request message
+        /// Set a metadata value of the request message
         /// </summary>
         /// <param name="key">the key</param>
-        /// <param name="value">the value</param>
+        /// <param name="value">the value as JSON, which may contain matchers</param>
         void WithRequestMetadata(string key, string value);
 
         /// <summary>
-        /// Set the metadata of the response message
+        /// Set a metadata value of all the existing response messages
         /// </summary>
         /// <param name="key">the key</param>
-        /// <param name="value">the value</param>
+        /// <param name="value">the value as JSON, which may contain matchers</param>
         void WithResponseMetadata(string key, string value);
 
         /// <summary>
