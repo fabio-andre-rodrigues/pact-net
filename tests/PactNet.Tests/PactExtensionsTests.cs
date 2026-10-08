@@ -228,6 +228,56 @@ namespace PactNet.Tests
         }
 
         [Fact]
+        public void WithSynchronousMessageInteractions_V4_CreatesExpectedPactFile()
+        {
+            IPactV4 messagePact = Pact.V4("PactExtensionsTests-SyncMessageConsumer-V4", "PactExtensionsTests-SyncMessageProvider", config);
+            ISyncMessagePactBuilderV4 builder = messagePact.WithSynchronousMessageInteractions();
+
+            SyncData received = null;
+
+            builder
+               .WithPactMetadata("framework", "language", "C#")
+               .ExpectsToReceive("a sample request")
+               .Given("a provider state")
+               .Given("a provider state with params", new Dictionary<string, string>
+                {
+                    ["foo"] = "bar"
+                })
+               .WithRequestMetadata("queueId", "1234")
+               .WithRequestMetadata("priority", 1)
+               .WithRequestJsonContent(new { Int = Match.Integer(1), String = Match.Type("a description") })
+               .WithResponseMetadata("replyTo", Match.Regex("queue-1", "^queue-"))
+               .WithResponseJsonContent(new { Int = Match.Integer(2), String = Match.Type("a reply") })
+               .Verify<SyncData, SyncData>(request =>
+                {
+                    received = request;
+                    return new SyncData { Int = 2, String = "a reply" };
+                });
+
+            received.Should().BeEquivalentTo(new SyncData { Int = 1, String = "a description" });
+
+            string actualPact = File.ReadAllText("PactExtensionsTests-SyncMessageConsumer-V4-PactExtensionsTests-SyncMessageProvider.json").TrimEnd();
+            string expectedPact = File.ReadAllText("data/v4-sync-message-consumer-integration.json").TrimEnd();
+
+            actualPact.Should().Be(expectedPact);
+        }
+
+        [Fact]
+        public void WithSynchronousMessageInteractions_ResponseDoesNotMatch_Throws()
+        {
+            IPactV4 messagePact = Pact.V4("PactExtensionsTests-SyncMessageConsumer-Mismatch", "PactExtensionsTests-SyncMessageProvider", config);
+
+            Action action = () => messagePact
+                .WithSynchronousMessageInteractions()
+                .ExpectsToReceive("a sample request")
+                .WithRequestJsonContent(new { Int = 1 })
+                .WithResponseJsonContent(new { Int = 2, String = "a reply" })
+                .Verify<SyncData, SyncData>(_ => new SyncData { Int = 3, String = "something else" });
+
+            action.Should().Throw<Exception>();
+        }
+
+        [Fact]
         public async Task CombinedHttpAndMessageInteractions_v4_CreatesExpectedPactFile()
         {
             IPactV4 pact = Pact.V4("PactExtensionsTests-Combined-V4", "PactExtensionsTests-Provider", config);
@@ -301,6 +351,12 @@ namespace PactNet.Tests
             string responseContent = await response.Content.ReadAsStringAsync();
             TestData responseData = JsonSerializer.Deserialize<TestData>(responseContent, jsonSettings);
             responseData.Should().BeEquivalentTo(body);
+        }
+
+        public class SyncData
+        {
+            public int Int { get; set; }
+            public string String { get; set; }
         }
 
         public class TestData

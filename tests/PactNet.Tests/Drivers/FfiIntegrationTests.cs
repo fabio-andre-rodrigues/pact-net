@@ -130,9 +130,7 @@ namespace PactNet.Tests.Drivers
             pactContents.Should().Be(expectedPactContent);
         }
 
-        [Fact(Skip = "Requires a pact_ffi build with pactffi_sync_message_generate_contents " +
-                     "(see https://github.com/pact-foundation/pact-reference/pull/555); " +
-                     "remove this Skip once that lands in a released pact_ffi version")]
+        [Fact]
         public void SyncMessageInteraction_v4_CreatesPactFile()
         {
             var driver = new PactDriver();
@@ -145,10 +143,13 @@ namespace PactNet.Tests.Drivers
 
                 ISyncMessageInteractionDriver interaction = pact.NewSyncMessageInteraction("a sync message interaction");
 
-                interaction.WithRequestMetadata("foo", "bar");
+                interaction.WithRequestMetadata("foo", @"""bar""");
+                interaction.WithRequestMetadata("count", "42");
                 interaction.WithRequestContents("application/json", @"{""foo"":42}");
-                interaction.WithResponseMetadata("baz", "bash");
+
+                // response metadata only applies to responses that already exist, so set the contents first
                 interaction.WithResponseContents("application/json", @"{""baz"":42}");
+                interaction.WithResponseMetadata("baz", @"{""pact:matcher:type"":""regex"",""value"":""bash"",""regex"":""^ba""}");
 
                 string generated = interaction.GenerateContents();
                 generated.Should().NotBeNullOrEmpty();
@@ -162,6 +163,10 @@ namespace PactNet.Tests.Drivers
 
             var file = new FileInfo("NativeDriverTests-Consumer-V4-NativeDriverTests-Producer.json");
             file.Exists.Should().BeTrue();
+
+            string pactContents = File.ReadAllText(file.FullName).TrimEnd();
+            string expectedPactContent = File.ReadAllText("data/v4-sync-message-integration.json").TrimEnd();
+            pactContents.Should().Be(expectedPactContent);
         }
     }
 }
